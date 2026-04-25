@@ -1,0 +1,11 @@
+## Android SDK 경로 예시 (실제 경로로 바꿔주세요)
+## cp local.properties.example local.properties
+
+# macOS
+sdk.dir=/Users/<your_name>/Library/Android/sdk
+
+# Linux
+# sdk.dir=/home/<your_name>/Android/Sdk
+
+# Windows
+# sdk.dir=C\:\\Users\\<your_name>\\AppData\\Local\\Android\\Sdk

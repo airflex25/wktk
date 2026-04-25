@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- 마이크 -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- 네트워크 -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- 백그라운드 통신용 (선택) -->
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+
+    <!-- HTTP 디버그 통신을 위해 cleartext 허용 (debug 전용 권장) -->
+    <application
+        android:allowBackup="false"
+        android:label="wktk"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.Wktk"
+        android:usesCleartextTraffic="true">
+
+        <activity
+            android:name="com.wktk.MainActivity"
+            android:exported="true"
+            android:configChanges="orientation|screenSize|keyboardHidden">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

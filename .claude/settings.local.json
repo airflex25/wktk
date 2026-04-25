@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(/opt/homebrew/share/android-commandlinetools/platform-tools/adb -s R3CT90B7WRR shell dumpsys activity activities)"
+    ]
+  }
+}

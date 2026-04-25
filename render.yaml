@@ -1,0 +1,11 @@
+# Render 배포 설정 (Blueprint).
+# Render에서 New > Blueprint > 이 repo 선택하면 자동 적용됨.
+services:
+  - type: web
+    name: wktk-signaling
+    runtime: node
+    rootDir: server
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health

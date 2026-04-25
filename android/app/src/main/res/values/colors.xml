@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 메인 컬러: 군용/필드 느낌의 올리브 그린 계열 -->
+    <color name="primary">#4CAF50</color>
+    <color name="primary_dark">#388E3C</color>
+    <color name="on_primary">#FFFFFF</color>
+
+    <!-- 배경 -->
+    <color name="background">#121212</color>
+    <color name="surface">#1E1E1E</color>
+    <color name="on_surface">#E0E0E0</color>
+
+    <!-- PTT 버튼: 송신 중 빨강, 대기 중 어두운 슬레이트 -->
+    <color name="ptt_active">#E53935</color>
+    <color name="ptt_idle">#455A64</color>
+
+    <!-- 에러 -->
+    <color name="error">#CF6679</color>
+</resources>

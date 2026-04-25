@@ -1,0 +1,17 @@
+{
+  "name": "wktk-server",
+  "version": "0.1.0",
+  "description": "Walkie-talkie signaling server (6-digit key matching + WebRTC signaling)",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch src/index.js",
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "socket.io": "^4.7.5"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

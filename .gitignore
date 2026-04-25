@@ -1,0 +1,21 @@
+# Node
+node_modules/
+npm-debug.log*
+
+# Android
+android/local.properties
+android/.gradle/
+android/build/
+android/app/build/
+android/captures/
+android/.idea/
+*.iml
+*.keystore
+*.jks
+
+# macOS
+.DS_Store
+
+# IDE
+.vscode/
+.fleet/

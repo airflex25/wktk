@@ -1,0 +1,9 @@
+<resources>
+    <!-- Compose는 자체 테마 시스템을 사용하므로 Activity 레벨은 최소화 -->
+    <style name="Theme.Wktk" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/background</item>
+        <item name="android:statusBarColor">@color/background</item>
+        <item name="android:navigationBarColor">@color/background</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+</resources>

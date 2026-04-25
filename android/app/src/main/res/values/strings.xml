@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">wktk</string>
+    <string name="label_key_hint">6자리 주파수 키</string>
+    <string name="btn_new_key">새 키 받기</string>
+    <string name="btn_join">입장</string>
+    <string name="btn_leave">나가기</string>
+    <string name="label_connected">서버 연결됨</string>
+    <string name="label_connecting">서버 연결 중…</string>
+    <string name="label_peers">연결된 사람</string>
+    <string name="label_vox">항상 켜기 (VOX)</string>
+    <string name="ptt_talking">TALKING</string>
+    <string name="ptt_push">PUSH TO TALK</string>
+    <string name="ptt_vox_on">VOX ON</string>
+    <string name="error_invalid_key">6자리 숫자를 입력하세요</string>
+</resources>
