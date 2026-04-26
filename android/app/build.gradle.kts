@@ -15,14 +15,14 @@ android {
         targetSdk = 34
         versionCode = 1
         versionName = "0.1.0"
-        // 시그널링 서버 주소. Cloudflare Tunnel 경유 (Mac에서 cloudflared + 로컬 server).
-        buildConfigField("String", "SIGNALING_URL", "\"https://innovative-ballet-crystal-appreciated.trycloudflare.com\"")
+        // 시그널링 서버 주소 (Render 무료 호스팅, 영구 고정 URL).
+        buildConfigField("String", "SIGNALING_URL", "\"https://wktk-signaling.onrender.com\"")
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
-            buildConfigField("String", "SIGNALING_URL", "\"https://innovative-ballet-crystal-appreciated.trycloudflare.com\"")
+            buildConfigField("String", "SIGNALING_URL", "\"https://wktk-signaling.onrender.com\"")
         }
     }
 
@@ -36,6 +36,9 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions { jvmTarget = "17" }
+
+    // APK 출력 이름: wktk-debug.apk / wktk-release.apk (기본 'app-' 접두사 제거).
+    setProperty("archivesBaseName", "wktk")
 }
 
 dependencies {

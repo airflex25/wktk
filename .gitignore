@@ -13,6 +13,9 @@ android/.idea/
 *.keystore
 *.jks
 
+# 릴리즈 서명 정보 (절대 커밋 금지)
+mobile/android/key.properties
+
 # macOS
 .DS_Store
 

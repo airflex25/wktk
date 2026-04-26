@@ -14,7 +14,9 @@
     <!-- HTTP 디버그 통신을 위해 cleartext 허용 (debug 전용 권장) -->
     <application
         android:allowBackup="false"
-        android:label="wktk"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:label="@string/app_name"
         android:supportsRtl="true"
         android:theme="@style/Theme.Wktk"
         android:usesCleartextTraffic="true">

@@ -1,5 +1,6 @@
 package com.wktk.signaling
 
+import android.util.Log
 import io.socket.client.IO
 import io.socket.client.Socket
 import kotlinx.coroutines.channels.Channel
@@ -25,9 +26,20 @@ class SignalingClient(private val url: String) {
             .setReconnection(true)
             .setReconnectionDelay(1_000)
             .build()
+        Log.i("wktk-sig", "connecting to $url")
         socket = IO.socket(url, opts).apply {
-            on(Socket.EVENT_CONNECT) { channel.trySend(SignalingEvent.Connected) }
-            on(Socket.EVENT_DISCONNECT) { channel.trySend(SignalingEvent.Disconnected) }
+            on(Socket.EVENT_CONNECT) {
+                Log.i("wktk-sig", "CONNECTED")
+                channel.trySend(SignalingEvent.Connected)
+            }
+            on(Socket.EVENT_DISCONNECT) {
+                Log.w("wktk-sig", "DISCONNECTED ${it.firstOrNull()}")
+                channel.trySend(SignalingEvent.Disconnected)
+            }
+            on(Socket.EVENT_CONNECT_ERROR) { args ->
+                val err = args.firstOrNull()
+                Log.e("wktk-sig", "CONNECT_ERROR cls=${err?.javaClass?.name} msg=$err", err as? Throwable)
+            }
 
             on("key:assigned") { args ->
                 val key = (args.firstOrNull() as? JSONObject)?.optString("key") ?: return@on

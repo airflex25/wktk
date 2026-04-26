@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">wktk</string>
+    <string name="app_name">시동걸어</string>
     <string name="label_key_hint">6자리 주파수 키</string>
     <string name="btn_new_key">새 키 받기</string>
     <string name="btn_join">입장</string>
