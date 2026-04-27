@@ -66,6 +66,9 @@ class _HomePageState extends State<HomePage> {
   TalkMode _mode = TalkMode.ptt;
   bool _transmitting = false;
   String? _error;
+  // 15초 후 ICE 연결 안 됐으면 재연결 버튼 표시.
+  Timer? _retryTimer;
+  bool _showRetry = false;
 
   @override
   void initState() {
@@ -80,7 +83,7 @@ class _HomePageState extends State<HomePage> {
       return;
     }
     final signaling = SignalingService(_signalingUrl);
-    final rtc = RtcService(signaling);
+    final rtc = RtcService(signaling, signalingUrl: _signalingUrl);
     await rtc.start();
     _sub = signaling.events.listen(_onEvent);
     signaling.connect();
@@ -105,8 +108,10 @@ class _HomePageState extends State<HomePage> {
           _joinedKey = e.key;
           _peers = e.peers;
           _error = null;
+          _showRetry = false;
         });
         if (e.peers.isNotEmpty) _rtc?.callPeers(e.peers);
+        _scheduleRetryCheck();
       case PeerJoined():
         setState(() => _peers = [..._peers, e.peerId]);
       case PeerLeft():
@@ -122,6 +127,7 @@ class _HomePageState extends State<HomePage> {
   @override
   void dispose() {
     _sub?.cancel();
+    _retryTimer?.cancel();
     _rtc?.closeAll();
     _signaling?.disconnect();
     _keyController.dispose();
@@ -140,25 +146,53 @@ class _HomePageState extends State<HomePage> {
 
   void _leave() {
     _signaling?.leaveKey();
+    _retryTimer?.cancel();
+    _retryTimer = null;
     setState(() {
       _joinedKey = null;
       _peers = const [];
       _keyController.clear();
+      _showRetry = false;
     });
   }
 
+  void _scheduleRetryCheck() {
+    _retryTimer?.cancel();
+    // 15초 후 ICE 연결 안 된 피어 있으면 재시도 버튼 노출.
+    _retryTimer = Timer(const Duration(seconds: 15), () {
+      if (!mounted) return;
+      final connected = _rtc?.connectedPeers.value ?? const <String>{};
+      if (_peers.any((p) => !connected.contains(p))) {
+        setState(() => _showRetry = true);
+      }
+    });
+  }
+
+  Future<void> _retryConnection() async {
+    setState(() => _showRetry = false);
+    await _rtc?.retryConnections();
+    _scheduleRetryCheck();
+  }
+
   void _setMode(TalkMode m) {
-    setState(() => _mode = m);
+    if (_mode == m) return;
+    setState(() {
+      _mode = m;
+      // 모드 전환 시 송신 상태도 초기화: VOX 는 항상 송신, PTT 는 OFF로 시작.
+      _transmitting = m == TalkMode.vox;
+    });
     _rtc?.setMicEnabled(m == TalkMode.vox);
   }
 
   void _pttDown() {
-    if (_mode == TalkMode.ptt) _rtc?.setMicEnabled(true);
+    if (_mode != TalkMode.ptt) return;
+    _rtc?.setMicEnabled(true);
     setState(() => _transmitting = true);
   }
 
   void _pttUp() {
-    if (_mode == TalkMode.ptt) _rtc?.setMicEnabled(false);
+    if (_mode != TalkMode.ptt) return;
+    _rtc?.setMicEnabled(false);
     setState(() => _transmitting = false);
   }
 
@@ -188,14 +222,17 @@ class _HomePageState extends State<HomePage> {
                       : _Room(
                           key: const ValueKey('room'),
                           joinedKey: _joinedKey!,
-                          peerCount: _peers.length,
+                          peers: _peers,
+                          connectedPeers: _rtc?.connectedPeers,
                           mode: _mode,
                           transmitting: _transmitting,
                           peerAudioLevel: _rtc?.peerAudioLevel,
+                          showRetry: _showRetry,
                           onSetMode: _setMode,
                           onPttDown: _pttDown,
                           onPttUp: _pttUp,
                           onLeave: _leave,
+                          onRetry: _retryConnection,
                         ),
                 ),
               ),
@@ -383,119 +420,185 @@ class _Lobby extends StatelessWidget {
 
 class _Room extends StatelessWidget {
   final String joinedKey;
-  final int peerCount;
+  final List<String> peers;
+  final ValueListenable<Set<String>>? connectedPeers;
   final TalkMode mode;
   final bool transmitting;
   final ValueListenable<double>? peerAudioLevel;
+  final bool showRetry;
   final ValueChanged<TalkMode> onSetMode;
   final VoidCallback onPttDown;
   final VoidCallback onPttUp;
   final VoidCallback onLeave;
+  final VoidCallback onRetry;
 
   const _Room({
     super.key,
     required this.joinedKey,
-    required this.peerCount,
+    required this.peers,
+    required this.connectedPeers,
     required this.mode,
     required this.transmitting,
     required this.peerAudioLevel,
+    required this.showRetry,
     required this.onSetMode,
     required this.onPttDown,
     required this.onPttUp,
     required this.onLeave,
+    required this.onRetry,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-          decoration: BoxDecoration(
-            color: _surface,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x0D000000),
-                blurRadius: 8,
-                offset: Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Column(
-            children: [
-              const Text('주파수', style: TextStyle(color: _muted, fontSize: 12)),
-              const SizedBox(height: 4),
-              Text(
-                joinedKey,
-                style: const TextStyle(
-                  color: _ink,
-                  fontSize: 36,
-                  letterSpacing: 8,
-                  fontWeight: FontWeight.w800,
-                  fontFeatures: [FontFeature.tabularFigures()],
-                ),
-              ),
-              const SizedBox(height: 8),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.people_outline, size: 14, color: _muted),
-                  const SizedBox(width: 4),
-                  Text(
-                    '연결된 사람 $peerCount',
-                    style: const TextStyle(color: _muted, fontSize: 12),
+    final connectedListen = connectedPeers ?? ValueNotifier<Set<String>>(<String>{});
+    return ValueListenableBuilder<Set<String>>(
+      valueListenable: connectedListen,
+      builder: (context, connected, _) {
+        final connectedCount = peers.where(connected.contains).length;
+        final pendingCount = peers.length - connectedCount;
+        final hasPeer = peers.isNotEmpty;
+        final allReady = hasPeer && pendingCount == 0;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+              decoration: BoxDecoration(
+                color: _surface,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x0D000000),
+                    blurRadius: 8,
+                    offset: Offset(0, 2),
                   ),
                 ],
               ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 18),
-        Expanded(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              SizedBox(
-                height: 70,
-                child: _Waveform(
-                  active: peerCount > 0,
-                  transmitting: transmitting,
-                  peerAudioLevel: peerAudioLevel,
+              child: Column(
+                children: [
+                  const Text('주파수', style: TextStyle(color: _muted, fontSize: 12)),
+                  const SizedBox(height: 4),
+                  Text(
+                    joinedKey,
+                    style: const TextStyle(
+                      color: _ink,
+                      fontSize: 36,
+                      letterSpacing: 8,
+                      fontWeight: FontWeight.w800,
+                      fontFeatures: [FontFeature.tabularFigures()],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  _peerStatusLine(
+                    total: peers.length,
+                    connected: connectedCount,
+                    pending: pendingCount,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 18),
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  SizedBox(
+                    height: 70,
+                    child: _Waveform(
+                      active: allReady,
+                      transmitting: transmitting,
+                      peerAudioLevel: peerAudioLevel,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  if (showRetry && pendingCount > 0)
+                    OutlinedButton.icon(
+                      onPressed: onRetry,
+                      icon: const Icon(Icons.refresh, size: 16),
+                      label: const Text('재연결'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: _hot,
+                        side: const BorderSide(color: _hot),
+                      ),
+                    )
+                  else
+                    const SizedBox(height: 12),
+                  const SizedBox(height: 16),
+                  _TalkButton(
+                    mode: mode,
+                    transmitting: transmitting,
+                    enabled: allReady,
+                    onDown: onPttDown,
+                    onUp: onPttUp,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                _modeChip(
+                  label: 'PTT',
+                  selected: mode == TalkMode.ptt,
+                  onTap: () => onSetMode(TalkMode.ptt),
                 ),
-              ),
-              const SizedBox(height: 28),
-              _TalkButton(
-                mode: mode,
-                transmitting: transmitting,
-                onDown: onPttDown,
-                onUp: onPttUp,
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
-        Row(
-          children: [
-            _modeChip(
-              label: 'PTT',
-              selected: mode == TalkMode.ptt,
-              onTap: () => onSetMode(TalkMode.ptt),
-            ),
-            const SizedBox(width: 8),
-            _modeChip(
-              label: '항상 켜기',
-              selected: mode == TalkMode.vox,
-              onTap: () => onSetMode(TalkMode.vox),
-            ),
-            const Spacer(),
-            TextButton(
-              onPressed: onLeave,
-              style: TextButton.styleFrom(foregroundColor: _muted),
-              child: const Text('나가기', style: TextStyle(fontWeight: FontWeight.w600)),
+                const SizedBox(width: 8),
+                _modeChip(
+                  label: '항상 켜기',
+                  selected: mode == TalkMode.vox,
+                  onTap: () => onSetMode(TalkMode.vox),
+                ),
+                const Spacer(),
+                TextButton(
+                  onPressed: onLeave,
+                  style: TextButton.styleFrom(foregroundColor: _muted),
+                  child: const Text('나가기', style: TextStyle(fontWeight: FontWeight.w600)),
+                ),
+              ],
             ),
           ],
+        );
+      },
+    );
+  }
+
+  Widget _peerStatusLine({required int total, required int connected, required int pending}) {
+    if (total == 0) {
+      return Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: const [
+          Icon(Icons.people_outline, size: 14, color: _muted),
+          SizedBox(width: 4),
+          Text('상대방을 기다리는 중...', style: TextStyle(color: _muted, fontSize: 12)),
+        ],
+      );
+    }
+    if (pending > 0) {
+      return Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const SizedBox(
+            width: 12,
+            height: 12,
+            child: CircularProgressIndicator(strokeWidth: 1.6, color: _accent),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            '연결 중... ($connected/$total)',
+            style: const TextStyle(color: _accent, fontSize: 12, fontWeight: FontWeight.w600),
+          ),
+        ],
+      );
+    }
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        const Icon(Icons.people_outline, size: 14, color: Color(0xFF1E7E34)),
+        const SizedBox(width: 4),
+        Text(
+          '연결됨 · $connected명',
+          style: const TextStyle(color: Color(0xFF1E7E34), fontSize: 12, fontWeight: FontWeight.w600),
         ),
       ],
     );
@@ -528,12 +631,14 @@ class _Room extends StatelessWidget {
 class _TalkButton extends StatelessWidget {
   final TalkMode mode;
   final bool transmitting;
+  final bool enabled;
   final VoidCallback onDown;
   final VoidCallback onUp;
 
   const _TalkButton({
     required this.mode,
     required this.transmitting,
+    required this.enabled,
     required this.onDown,
     required this.onUp,
   });
@@ -541,14 +646,21 @@ class _TalkButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isVox = mode == TalkMode.vox;
-    final hot = transmitting || isVox;
-    final label = isVox
-        ? '항상 켜짐'
-        : (transmitting ? 'TALKING' : 'PUSH TO TALK');
+    final hot = enabled && (transmitting || isVox);
+    final label = !enabled
+        ? '연결 대기'
+        : isVox
+            ? '항상 켜짐'
+            : (transmitting ? 'TALKING' : 'PUSH TO TALK');
+    final colors = !enabled
+        ? const [Color(0xFFB0B5BC), Color(0xFF8A92A6)]
+        : hot
+            ? const [Color(0xFFFF6B5C), Color(0xFFE94E3D)]
+            : const [Color(0xFF2A6B7C), Color(0xFF1F5F70)];
     return GestureDetector(
-      onTapDown: isVox ? null : (_) => onDown(),
-      onTapUp: isVox ? null : (_) => onUp(),
-      onTapCancel: isVox ? null : onUp,
+      onTapDown: (!enabled || isVox) ? null : (_) => onDown(),
+      onTapUp: (!enabled || isVox) ? null : (_) => onUp(),
+      onTapCancel: (!enabled || isVox) ? null : onUp,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 140),
         curve: Curves.easeOutCubic,
@@ -558,26 +670,26 @@ class _TalkButton extends StatelessWidget {
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: hot
-                ? const [Color(0xFFFF6B5C), Color(0xFFE94E3D)]
-                : const [Color(0xFF2A6B7C), Color(0xFF1F5F70)],
+            colors: colors,
           ),
           shape: BoxShape.circle,
-          boxShadow: [
-            BoxShadow(
-              color: (hot ? _hot : _accent).withValues(alpha: 0.32),
-              blurRadius: hot ? 30 : 18,
-              spreadRadius: hot ? 4 : 0,
-              offset: const Offset(0, 8),
-            ),
-          ],
+          boxShadow: enabled
+              ? [
+                  BoxShadow(
+                    color: (hot ? _hot : _accent).withValues(alpha: 0.32),
+                    blurRadius: hot ? 30 : 18,
+                    spreadRadius: hot ? 4 : 0,
+                    offset: const Offset(0, 8),
+                  ),
+                ]
+              : null,
         ),
         alignment: Alignment.center,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
-              hot ? Icons.mic : Icons.mic_none,
+              !enabled ? Icons.mic_off : (hot ? Icons.mic : Icons.mic_none),
               color: Colors.white,
               size: 38,
             ),

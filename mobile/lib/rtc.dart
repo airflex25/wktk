@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
 import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
@@ -11,6 +13,7 @@ import 'signaling.dart';
 ///   - 송신 토글은 [setMicEnabled]만 호출 (재협상 불필요).
 class RtcService {
   final SignalingService signaling;
+  final String signalingUrl;
   final _peers = <String, RTCPeerConnection>{};
   MediaStream? _localStream;
 
@@ -20,18 +23,62 @@ class RtcService {
   ValueListenable<double> get peerAudioLevel => _peerAudioLevel;
   Timer? _statsTimer;
 
-  RtcService(this.signaling);
+  /// ICE connected 상태인 peerId 집합. UI에서 "연결 중" / "연결됨" 구분.
+  final _connectedPeers = ValueNotifier<Set<String>>(<String>{});
+  ValueListenable<Set<String>> get connectedPeers => _connectedPeers;
 
-  static const _config = <String, dynamic>{
-    'iceServers': [
-      {'urls': 'stun:stun.l.google.com:19302'},
-      {'urls': 'stun:stun1.l.google.com:19302'},
-    ],
-    'sdpSemantics': 'unified-plan',
-  };
+  RtcService(this.signaling, {required this.signalingUrl});
+
+  // 기본 ICE servers (Google STUN). TURN fetch 실패 시 fallback.
+  static const _fallbackIceServers = [
+    {'urls': 'stun:stun.l.google.com:19302'},
+    {'urls': 'stun:stun1.l.google.com:19302'},
+  ];
+
+  // 서버에서 받은 Cloudflare TURN ice servers. 없으면 fallback.
+  List<Map<String, dynamic>> _iceServers = const [];
+  Future<void>? _turnFetchInFlight;
+
+  Map<String, dynamic> get _config => {
+        'iceServers': _iceServers.isEmpty ? _fallbackIceServers : _iceServers,
+        'sdpSemantics': 'unified-plan',
+      };
+
+  /// 서버 /turn-credentials 호출. 실패해도 STUN-only로 동작.
+  Future<void> _refreshTurnCredentials() async {
+    if (_turnFetchInFlight != null) return _turnFetchInFlight;
+    final completer = Completer<void>();
+    _turnFetchInFlight = completer.future;
+    try {
+      final uri = Uri.parse('$signalingUrl/turn-credentials');
+      final client = HttpClient()..connectionTimeout = const Duration(seconds: 5);
+      final req = await client.getUrl(uri);
+      final resp = await req.close();
+      if (resp.statusCode != 200) {
+        debugPrint('[wktk-rtc] TURN cred status ${resp.statusCode}');
+      } else {
+        final body = await resp.transform(utf8.decoder).join();
+        final data = jsonDecode(body) as Map<String, dynamic>;
+        final ice = data['iceServers'];
+        if (ice is Map) {
+          _iceServers = [Map<String, dynamic>.from(ice)];
+        } else if (ice is List) {
+          _iceServers = ice.cast<Map<String, dynamic>>();
+        }
+        debugPrint('[wktk-rtc] TURN servers loaded (${_iceServers.length})');
+      }
+    } catch (e) {
+      debugPrint('[wktk-rtc] TURN cred fetch failed: $e');
+    } finally {
+      completer.complete();
+      _turnFetchInFlight = null;
+    }
+  }
 
   Future<void> start() async {
     if (_localStream != null) return;
+    // 백그라운드로 TURN 자격증명 받아오기 (응답 안 와도 STUN으로는 진행 가능).
+    unawaited(_refreshTurnCredentials());
     _localStream = await navigator.mediaDevices.getUserMedia({
       'audio': {
         'echoCancellation': true,
@@ -150,7 +197,26 @@ class RtcService {
   Future<void> removePeer(String peerId) async {
     final pc = _peers.remove(peerId);
     _prevEnergy.remove(peerId);
+    final next = Set<String>.from(_connectedPeers.value)..remove(peerId);
+    _connectedPeers.value = next;
     await pc?.close();
+  }
+
+  /// 사용자가 명시적으로 재연결 요청. 연결 안 된 모든 피어에게 ICE restart 시도.
+  Future<void> retryConnections() async {
+    for (final entry in _peers.entries) {
+      final peerId = entry.key;
+      final pc = entry.value;
+      if (_connectedPeers.value.contains(peerId)) continue;
+      try {
+        final offer = await pc.createOffer({'iceRestart': true});
+        await pc.setLocalDescription(offer);
+        signaling.sendSignal(peerId, 'offer', {
+          'type': offer.type,
+          'sdp': offer.sdp,
+        });
+      } catch (_) {}
+    }
   }
 
   Future<void> closeAll() async {
@@ -171,6 +237,13 @@ class RtcService {
   Future<RTCPeerConnection> _ensurePeer(String peerId) async {
     final existing = _peers[peerId];
     if (existing != null) return existing;
+    // TURN 자격증명 fetch가 진행 중이면 잠시 대기 (최대 ~5초).
+    // 못 받아도 STUN-only로 진행 (callPeers 가 막히면 안 됨).
+    if (_iceServers.isEmpty && _turnFetchInFlight != null) {
+      try {
+        await _turnFetchInFlight!.timeout(const Duration(seconds: 5));
+      } catch (_) {}
+    }
     final pc = await createPeerConnection(_config);
     pc.onIceCandidate = (candidate) {
       signaling.sendSignal(peerId, 'ice', {
@@ -180,6 +253,17 @@ class RtcService {
       });
     };
     pc.onIceConnectionState = (state) async {
+      // UI에 보여줄 연결 상태 갱신.
+      final connected = state == RTCIceConnectionState.RTCIceConnectionStateConnected ||
+          state == RTCIceConnectionState.RTCIceConnectionStateCompleted;
+      final next = Set<String>.from(_connectedPeers.value);
+      if (connected) {
+        next.add(peerId);
+      } else {
+        next.remove(peerId);
+      }
+      _connectedPeers.value = next;
+
       if (state == RTCIceConnectionState.RTCIceConnectionStateFailed) {
         try {
           final offer = await pc.createOffer({'iceRestart': true});
