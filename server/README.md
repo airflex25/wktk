@@ -8,7 +8,7 @@ WebRTC 시그널링 + 6자리 key 룸 매칭만 담당.
 npm install
 npm run dev   # node --watch
 # 또는
-PORT=3000 ROOM_LIMIT=4 npm start
+PORT=3000 ROOM_LIMIT=8 npm start
 ```
 
 `GET /health` → `{ ok: true, ts }`
@@ -19,7 +19,7 @@ PORT=3000 ROOM_LIMIT=4 npm start
 |------|--------|------|
 | `PORT` | 3000 | HTTP 포트 |
 | `CORS_ORIGIN` | `*` | Socket.IO CORS origin |
-| `ROOM_LIMIT` | 4 | 같은 key 룸의 최대 동시 인원 |
+| `ROOM_LIMIT` | 8 | 같은 key 룸의 최대 동시 인원 |
 
 ## 코드 구조
 

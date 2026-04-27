@@ -2,7 +2,7 @@
 // 메모리 기반(단일 노드 가정). 멀티 노드로 확장하려면 Redis adapter로 교체.
 
 const KEY_RE = /^\d{6}$/;
-const ROOM_LIMIT = Number(process.env.ROOM_LIMIT ?? 4);
+const ROOM_LIMIT = Number(process.env.ROOM_LIMIT ?? 8);
 
 /** key -> Set<peerId> */
 const rooms = new Map();

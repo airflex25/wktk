@@ -111,7 +111,7 @@ server/
 
 #### 룸 관리
 - 메모리 `Map<key, Set<peerId>>` 만 유지
-- 인원 한도: 4명 (`ROOM_LIMIT`, env로 조정 가능)
+- 인원 한도: 8명 (`ROOM_LIMIT`, env로 조정 가능)
 - 서버 재시작 시 룸 사라짐 (의도된 동작 — 익명/임시 통화 컨셉)
 
 ---
@@ -260,7 +260,7 @@ server/
 |-----|------|------|
 | `PORT` | (Render 자동 설정) | HTTP 포트 |
 | `CORS_ORIGIN` | ✗ (기본 `*`) | Socket.IO CORS |
-| `ROOM_LIMIT` | ✗ (기본 4) | 한 키 룸의 최대 인원 |
+| `ROOM_LIMIT` | ✗ (기본 8) | 한 키 룸의 최대 인원 |
 | `CF_TURN_KEY_ID` | **✓** | Cloudflare TURN Key ID |
 | `CF_TURN_API_TOKEN` | **✓** | Cloudflare TURN App Token |
 | `TURN_TTL` | ✗ (기본 3600) | TURN 자격증명 유효시간 (초) |
@@ -283,7 +283,7 @@ server/
 
 | 항목 | 한계 | 대응 |
 |------|------|------|
-| **mesh 인원** | 4명 (`ROOM_LIMIT`) | 그 이상 필요 시 SFU(예: mediasoup) 도입 |
+| **mesh 인원** | 8명 (`ROOM_LIMIT`) | 그 이상 필요 시 SFU(예: mediasoup) 도입. 8명 mesh 는 한 사람이 7개 PeerConnection 유지 (~500kbps 부하). |
 | **iOS 시뮬 음성** | audio I/O 미지원, 묵음 | 실기기 테스트 필수 |
 | **Render Free cold start** | 첫 요청 시 ~30초 지연 | Starter 플랜으로 업그레이드 |
 | **TURN 유료 임계** | 1TB/월 초과 시 GB당 $0.05 | 트래픽 모니터링 |

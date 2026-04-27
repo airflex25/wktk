@@ -36,7 +36,7 @@ Render Dashboard → wktk-signaling → Environment 메뉴에서 관리.
 | `CF_TURN_KEY_ID` | (Render env에 설정) | Cloudflare TURN Key ID |
 | `CF_TURN_API_TOKEN` | (Render env에 설정) | Cloudflare App Token. 노출 시 즉시 회전 |
 | `TURN_TTL` | `3600` (옵션) | TURN 자격증명 TTL (초) |
-| `ROOM_LIMIT` | `4` (옵션) | 한 룸 최대 인원 |
+| `ROOM_LIMIT` | `8` (옵션) | 한 룸 최대 인원 |
 | `CORS_ORIGIN` | `*` (옵션) | Socket.IO CORS |
 
 > 실제 값은 Render Dashboard 의 **Environment** 탭에만 보관. 문서·git·채팅에 절대 적지 않음.
