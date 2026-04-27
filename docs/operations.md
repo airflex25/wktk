@@ -33,11 +33,13 @@ Render Dashboard → wktk-signaling → Environment 메뉴에서 관리.
 
 | Key | 값 | 비고 |
 |-----|----|------|
-| `CF_TURN_KEY_ID` | `a101347b6e2c3a2b42e7b9c8c4f9d4ec` | Cloudflare TURN Key ID |
-| `CF_TURN_API_TOKEN` | `(시크릿)` | Cloudflare App Token. 노출 시 즉시 회전 |
+| `CF_TURN_KEY_ID` | (Render env에 설정) | Cloudflare TURN Key ID |
+| `CF_TURN_API_TOKEN` | (Render env에 설정) | Cloudflare App Token. 노출 시 즉시 회전 |
 | `TURN_TTL` | `3600` (옵션) | TURN 자격증명 TTL (초) |
 | `ROOM_LIMIT` | `4` (옵션) | 한 룸 최대 인원 |
 | `CORS_ORIGIN` | `*` (옵션) | Socket.IO CORS |
+
+> 실제 값은 Render Dashboard 의 **Environment** 탭에만 보관. 문서·git·채팅에 절대 적지 않음.
 
 > 환경변수 변경 후 Render가 **자동 재배포**합니다 (1-2분 소요).
 
@@ -87,9 +89,8 @@ git push
 ## TURN 서버 (Cloudflare Realtime)
 
 ### 앱 정보
-- **이름**: `withered-firefly-1ce8`
-- **Key ID**: `a101347b6e2c3a2b42e7b9c8c4f9d4ec`
-- **App Token**: 시크릿 (Cloudflare Dashboard 또는 Render env에 보관)
+- **이름**: `withered-firefly-1ce8` (변경 불필요, 단순 라벨)
+- **Key ID / App Token**: Render env (`CF_TURN_KEY_ID`, `CF_TURN_API_TOKEN`) 에만 보관
 
 ### 사용량 확인
 1. https://dash.cloudflare.com 접속
