@@ -70,17 +70,18 @@ const http = createServer(async (req, res) => {
     return;
   }
 
-  // 관리자 대시보드. ADMIN_TOKEN 미설정이면 비활성.
+  // 관리자 대시보드 페이지(로그인 폼). ADMIN_TOKEN 미설정이면 비활성.
   if (path === '/admin' || path === '/admin/') {
-    if (!checkAdminToken(req)) {
-      res.writeHead(401, { 'Content-Type': 'text/plain; charset=utf-8' });
-      res.end('Unauthorized — URL 에 ?token=... 추가 필요');
+    if (!ADMIN_TOKEN) {
+      res.writeHead(404);
+      res.end();
       return;
     }
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
     res.end(adminHtml);
     return;
   }
+  // 통계 데이터 — 토큰 필수.
   if (path === '/admin/stats') {
     if (!checkAdminToken(req)) {
       res.writeHead(401, { 'Content-Type': 'application/json' });
