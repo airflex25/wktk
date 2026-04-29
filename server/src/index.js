@@ -7,12 +7,16 @@
 import { createServer } from 'node:http';
 import { Server } from 'socket.io';
 import { attachSignaling } from './signaling.js';
+import { getStats } from './room.js';
+import { adminHtml } from './admin-page.js';
 
 const PORT = Number(process.env.PORT ?? 3000);
 const ORIGIN = process.env.CORS_ORIGIN ?? '*';
 const CF_TURN_KEY_ID = process.env.CF_TURN_KEY_ID;
 const CF_TURN_API_TOKEN = process.env.CF_TURN_API_TOKEN;
 const TURN_TTL = Number(process.env.TURN_TTL ?? 3600); // 1시간
+// 관리자 대시보드 보호용 토큰. 미설정 시 /admin 비활성화.
+const ADMIN_TOKEN = process.env.ADMIN_TOKEN;
 
 // Cloudflare TURN 임시 자격증명 발급.
 // 클라이언트가 PeerConnection 만들기 전에 호출. 하드코딩 토큰 노출 회피.
@@ -36,13 +40,23 @@ async function generateTurnCredentials() {
   return resp.json();
 }
 
+function checkAdminToken(req) {
+  if (!ADMIN_TOKEN) return false;
+  const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+  const fromQuery = url.searchParams.get('token');
+  const fromHeader = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
+  return fromQuery === ADMIN_TOKEN || fromHeader === ADMIN_TOKEN;
+}
+
 const http = createServer(async (req, res) => {
-  if (req.url === '/health') {
+  const path = (req.url || '/').split('?')[0];
+
+  if (path === '/health') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ ok: true, ts: Date.now() }));
     return;
   }
-  if (req.url === '/turn-credentials') {
+  if (path === '/turn-credentials') {
     res.setHeader('Access-Control-Allow-Origin', ORIGIN);
     try {
       const data = await generateTurnCredentials();
@@ -55,6 +69,29 @@ const http = createServer(async (req, res) => {
     }
     return;
   }
+
+  // 관리자 대시보드. ADMIN_TOKEN 미설정이면 비활성.
+  if (path === '/admin' || path === '/admin/') {
+    if (!checkAdminToken(req)) {
+      res.writeHead(401, { 'Content-Type': 'text/plain; charset=utf-8' });
+      res.end('Unauthorized — URL 에 ?token=... 추가 필요');
+      return;
+    }
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.end(adminHtml);
+    return;
+  }
+  if (path === '/admin/stats') {
+    if (!checkAdminToken(req)) {
+      res.writeHead(401, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'unauthorized' }));
+      return;
+    }
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(getStats()));
+    return;
+  }
+
   res.writeHead(404);
   res.end();
 });

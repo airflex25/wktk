@@ -8,6 +8,14 @@ const ROOM_LIMIT = Number(process.env.ROOM_LIMIT ?? 8);
 const rooms = new Map();
 /** peerId -> key */
 const peerToKey = new Map();
+/** key -> 첫 참가자 입장 시각 (admin 통계용) */
+const roomCreatedAt = new Map();
+/** peerId -> 접속 시각 (admin 통계용) */
+const peerJoinedAt = new Map();
+/** 누적 통계 (서버 부팅 후 카운트) */
+let totalRoomsCreated = 0;
+let totalPeersJoined = 0;
+const serverStartedAt = Date.now();
 
 export function isValidKey(key) {
   return typeof key === 'string' && KEY_RE.test(key);
@@ -26,10 +34,17 @@ export function generateUnusedKey() {
 export function joinRoom(key, peerId) {
   if (!isValidKey(key)) return { ok: false, code: 'INVALID_KEY' };
   let set = rooms.get(key);
-  if (!set) { set = new Set(); rooms.set(key, set); }
+  if (!set) {
+    set = new Set();
+    rooms.set(key, set);
+    roomCreatedAt.set(key, Date.now());
+    totalRoomsCreated += 1;
+  }
   if (set.size >= ROOM_LIMIT) return { ok: false, code: 'ROOM_FULL' };
   set.add(peerId);
   peerToKey.set(peerId, key);
+  peerJoinedAt.set(peerId, Date.now());
+  totalPeersJoined += 1;
   return { ok: true, peers: [...set].filter(id => id !== peerId) };
 }
 
@@ -39,10 +54,37 @@ export function leaveRoom(peerId) {
   const set = rooms.get(key);
   if (set) {
     set.delete(peerId);
-    if (set.size === 0) rooms.delete(key);
+    if (set.size === 0) {
+      rooms.delete(key);
+      roomCreatedAt.delete(key);
+    }
   }
   peerToKey.delete(peerId);
+  peerJoinedAt.delete(peerId);
   return key;
+}
+
+/** Admin 대시보드용 스냅샷 */
+export function getStats() {
+  const list = [];
+  for (const [key, peers] of rooms) {
+    list.push({
+      key,
+      peerCount: peers.size,
+      createdAt: roomCreatedAt.get(key) ?? null,
+    });
+  }
+  // 인원 많은 룸부터
+  list.sort((a, b) => b.peerCount - a.peerCount || a.createdAt - b.createdAt);
+  return {
+    serverStartedAt,
+    uptimeMs: Date.now() - serverStartedAt,
+    activeRooms: rooms.size,
+    activePeers: peerToKey.size,
+    totalRoomsCreated,
+    totalPeersJoined,
+    rooms: list,
+  };
 }
 
 export function roomOf(peerId) {
